@@ -127,6 +127,8 @@ yarn-error.log*
 .idea/
 
 # Project specific
+docs/
+backend/models_cache/
 Goals.txt
 SARVAI_short_prompt.md
 # Docker volumes

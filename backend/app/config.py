@@ -1,4 +1,4 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
 import os
 from pathlib import Path
@@ -40,12 +40,32 @@ class Settings(BaseSettings):
     # Logging
     LOG_LEVEL: str = "INFO"
     
+    # LLM Configuration
+    OLLAMA_BASE_URL: str = "http://localhost:11434"
+    OLLAMA_MODEL: str = "llama3.2:latest"
+    LLM_TEMPERATURE: float = 0.7
+    LLM_MAX_TOKENS: int = 2048
+    LLM_CONTEXT_WINDOW: int = 4096
+    
+    # Web Search
+    BRAVE_API_KEY: str = ""
+    SERP_API_KEY: str = ""
+    WEB_SEARCH_RESULTS: int = 5
+    WEB_SCRAPE_TIMEOUT: int = 10
+    
+    # RAG Configuration
+    RAG_TOP_K: int = 5
+    RAG_HYBRID_ALPHA: float = 0.7
+    RAG_MIN_SIMILARITY: float = 0.3
+    RAG_ENABLE_RERANK: bool = False
+    
     # Optional APIs
     OPENAI_API_KEY: str = ""
     
-    class Config:
-        env_file = ".env"
-        case_sensitive = True
+    model_config = SettingsConfigDict(
+        env_file=Path(__file__).parent.parent / ".env",
+        case_sensitive=True
+    )
 
 # Create global settings instance
 settings = Settings()

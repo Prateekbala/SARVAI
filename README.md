@@ -16,6 +16,20 @@ This repository contains the SARVAI MVP: a FastAPI backend (PostgreSQL + pgvecto
 
 SARVAI aims to be the foundational memory layer for AI systems: a unified persistent memory that is multi-modal, personal, and evolves over time (clustering and compression planned in later phases).
 
+## Current Status
+
+✅ **Week 1**: Text memory foundation (ingestion, embeddings, search)  
+✅ **Week 2**: Multi-modal support (images, PDFs, audio)  
+✅ **Week 3**: Advanced RAG + web search integration  
+✅ **Week 4**: Authentication, personalization & production features  
+
+**Now in production-ready state with:**
+- JWT authentication
+- User preferences & personalized search
+- Analytics dashboard & timeline view
+- Rate limiting & error handling
+- Structured logging
+
 ## Tech stack
 
 - Backend: Python, FastAPI, async/await, Pydantic, SQLAlchemy
@@ -101,30 +115,70 @@ Now open the frontend (usually http://localhost:3000) and the API docs at http:/
 
 Example variables used by the project (set these in `backend/.env`):
 
-```
+```bash
+# Database
 DATABASE_URL=postgresql://user:password@localhost:5432/sarvai
+
+# MinIO (Object Storage)
 MINIO_ENDPOINT=localhost:9000
 MINIO_ACCESS_KEY=minioadmin
 MINIO_SECRET_KEY=minioadmin
 MINIO_BUCKET=sarvai
+
+# AI/ML
 EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
-OPENAI_API_KEY=sk-xxx  # optional
-BRAVE_API_KEY=xxx  # for web search (optional)
+
+# Authentication (Week 4)
+SECRET_KEY=<generate-with-openssl-rand-hex-32>
+ACCESS_TOKEN_EXPIRE_MINUTES=30
+
+# LLM (Week 3)
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=llama3.2:latest
+
+# Optional APIs
+OPENAI_API_KEY=sk-xxx
+BRAVE_API_KEY=xxx  # for web search
 ```
 
 Ensure the Postgres instance has the `pgvector` extension installed (the provided docker image `pgvector/pgvector` includes it).
 
 ## API overview
 
-The project follows a versioned API pattern under `/api/v1`. Example endpoints planned or implemented in the MVP:
+The project follows a versioned API pattern under `/api/v1`. Key endpoints:
 
-- POST `/api/v1/remember/text` — ingest plain text (chunks & embeddings)
-- POST `/api/v1/remember/image` — upload image (MinIO) + OCR + embeddings
-- POST `/api/v1/remember/pdf` — upload PDF + extract text + embeddings
-- POST `/api/v1/remember/audio` — upload audio + transcription + embeddings
-- GET `/api/v1/search?q={query}` — semantic search across memories
-- POST `/api/v1/ask` — RAG-style Q&A endpoint (builds context + queries an LLM)
-- GET `/api/v1/memories` — list stored memories
+**Authentication:**
+- POST `/api/v1/users` — Create user with password
+- POST `/api/v1/login` — Login and get JWT token
+
+**Memory Management:**
+- POST `/api/v1/remember/text` — Ingest plain text (chunks & embeddings)
+- POST `/api/v1/remember/image` — Upload image (MinIO) + OCR + embeddings
+- POST `/api/v1/remember/pdf` — Upload PDF + extract text + embeddings
+- POST `/api/v1/remember/audio` — Upload audio + transcription + embeddings
+- GET `/api/v1/search?q={query}` — Semantic search with personalization
+- GET `/api/v1/memories` — List stored memories
+- GET `/api/v1/memories/timeline` — Timeline view grouped by date
+
+**RAG & Conversations:**
+- POST `/api/v1/ask` — RAG-style Q&A endpoint (builds context + queries LLM)
+- POST `/api/v1/ask/stream` — Streaming RAG responses
+- GET `/api/v1/conversations` — List conversations
+- POST `/api/v1/conversations` — Create conversation
+
+**Personalization:**
+- GET `/api/v1/preferences` — Get user preferences
+- PUT `/api/v1/preferences` — Update preferences
+- POST `/api/v1/preferences/boost/{topic}` — Boost topic in search
+- POST `/api/v1/preferences/suppress/{topic}` — Suppress topic in search
+
+**Analytics:**
+- GET `/api/v1/stats/dashboard` — User statistics
+- GET `/api/v1/stats/popular-searches` — Popular search queries
+
+**Web Search:**
+- POST `/api/v1/web/search` — Search and scrape web content
+- POST `/api/v1/web/scrape` — Scrape specific URL
 
 FastAPI automatic docs are available at `/docs` (Swagger UI) when the backend is running.
 
@@ -133,34 +187,44 @@ FastAPI automatic docs are available at `/docs` (Swagger UI) when the backend is
 - The schema uses a `memories` table and an `embeddings` table (embedding vectors stored via `pgvector`).
 - Default embedding model: `sentence-transformers/all-MiniLM-L6-v2` (fast). You can replace this with a higher-quality model such as `all-mpnet-base-v2` if needed.
 
+## Roadmap & next phases
+
+Completed phases (see documentation in root):
+- ✅ Week 1: Text memory foundation (`WEEK1_COMPLETE.md`)
+- ✅ Week 2: Multi-modal support (`WEEK2_COMPLETE.md`)
+- ✅ Week 3: Advanced RAG + web search (`WEEK3_COMPLETE.md`)
+- ✅ Week 4: Authentication & personalization (`WEEK4_COMPLETE.md`)
+
+Future improvements:
+- Cross-modal linking and episodic memory compression
+- Advanced clustering and neural compression for long-term scaling
+- Multi-user collaboration features
+- Production deployment guides
+
+## Documentation
+
+- **Quick References**: `WEEK*_QUICK_REFERENCE.md` for each phase
+- **Implementation Details**: `WEEK*_IMPLEMENTATION_SUMMARY.md`
+- **Installation**: `INSTALLATION_GUIDE.md`
+- **Architecture**: `industry_architecture.md`, `advanced_components.md`
+
 ## Testing
 
-- Backend: add pytest-based unit tests under `backend/tests/` (recommended). Run with:
+Run comprehensive tests for each phase:
 
 ```bash
 cd backend
-pytest -q
+
+# Week 1 & 2: Multi-modal
+python test_multimodal.py
+
+# Week 3: RAG & web search
+python test_rag.py
+
+# Week 4: Auth & personalization
+python test_week4.py
+
+# All endpoints
+python test_all_endpoints.py
 ```
-
-- Frontend: use the project's chosen test runner (Vitest / Jest) depending on `package.json` configuration.
-
-## Development workflow
-
-- Use the provided Docker Compose to run Postgres and MinIO locally.
-- Develop the backend with `uvicorn --reload` and the frontend with `npm run dev`.
-- Keep environment-specific secrets out of the repository; use `.env` files or a secrets manager.
-
-## Security and privacy notes
-
-- SARVAI is designed to be local-first. When running locally, data and embeddings remain under your control (Postgres + MinIO instances). If you enable any cloud services or third-party APIs (OpenAI, Brave, etc.), review their policies and never commit API keys to the repository.
-- Validate and sanitize file uploads and limit file sizes as defined in project guidelines.
-
-## Roadmap & next phases
-
-Planned improvements (see `sarvai_short_prompt.md` and `Goals.txt`):
-
-- Cross-modal linking and episodic memory compression
-- Web-aware memory and web search integration
-- Improved clustering and neural compression for long-term scaling
-- Authentication, multi-user isolation, and production deployment
 
