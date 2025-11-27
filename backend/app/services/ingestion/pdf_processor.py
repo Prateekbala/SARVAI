@@ -8,23 +8,25 @@ import numpy as np
 
 from app.config import settings
 from app.services.ingestion.text_processor import text_processor
+from app.services.ingestion.paddle_ocr_service import paddle_ocr_service
 
 logger = logging.getLogger(__name__)
 
 class PDFProcessor:
-    """Service for processing PDF files: text extraction + OCR fallback"""
+    """Service for processing PDF files: text extraction + OCR with layout parsing"""
     
-    def __init__(self):
-        # Lazy load OCR reader
-        self._ocr_reader = None
+    def __init__(self, use_paddle_ocr: bool = True):
+        # Lazy load OCR readers
+        self._easyocr_reader = None
+        self.use_paddle_ocr = use_paddle_ocr
     
     @property
     def ocr_reader(self):
-        """Lazy load OCR reader"""
-        if self._ocr_reader is None:
+        """Lazy load EasyOCR reader"""
+        if self._easyocr_reader is None:
             logger.info("Initializing EasyOCR reader for PDF processing...")
-            self._ocr_reader = easyocr.Reader(['en'])
-        return self._ocr_reader
+            self._easyocr_reader = easyocr.Reader(['en'])
+        return self._easyocr_reader
     
     async def process_pdf(
         self,
@@ -32,7 +34,7 @@ class PDFProcessor:
         metadata: Optional[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
-        Process PDF: extract text from all pages, use OCR as fallback
+        Process PDF: extract text from all pages, use OCR with layout parsing as option
         
         Args:
             pdf_data: Binary PDF data
@@ -41,11 +43,13 @@ class PDFProcessor:
         Returns:
             Dict with:
                 - full_text: Complete extracted text
-                - pages: List of page texts
+                - pages: List of page texts with OCR/layout info
                 - chunks: Text chunks ready for embedding
-                - metadata: Enhanced metadata with page count, extraction method
+                - metadata: Enhanced metadata with extraction methods
                 - num_chunks: Number of chunks
                 - token_count: Total tokens
+                - layout_data: Layout structure per page
+                - ocr_results: OCR results per page (if used)
         """
         try:
             pdf_data.seek(0)
@@ -54,6 +58,8 @@ class PDFProcessor:
             pages_text = []
             total_text = []
             extraction_methods = []
+            layout_data_pages = []
+            ocr_results_pages = []
             
             for page_num in range(len(doc)):
                 page = doc[page_num]
@@ -61,13 +67,29 @@ class PDFProcessor:
                 # Try text extraction first
                 text = page.get_text()
                 
-                # If text extraction yields little content, use OCR
+                # If text extraction yields little content, use PaddleOCR with layout
                 if len(text.strip()) < 50:
-                    logger.info(f"Using OCR for page {page_num + 1}")
-                    text = await self._ocr_page(page)
-                    extraction_methods.append("ocr")
+                    logger.info(f"Using PaddleOCR with layout parsing for page {page_num + 1}")
+                    
+                    if self.use_paddle_ocr:
+                        # Use PaddleOCR with layout
+                        ocr_result = await paddle_ocr_service.extract_from_pdf_page(page, page_num + 1)
+                        text = ocr_result.get("text", "")
+                        layout_data_pages.append(ocr_result.get("layout", {}))
+                        ocr_results_pages.append({
+                            "page": page_num + 1,
+                            "paragraphs": ocr_result.get("paragraphs", []),
+                            "confidence": ocr_result.get("confidence", 0.0),
+                            "bboxes": ocr_result.get("bboxes", [])
+                        })
+                        extraction_methods.append("paddle_ocr")
+                    else:
+                        # Fallback to EasyOCR
+                        text = await self._ocr_page(page)
+                        extraction_methods.append("easyocr")
                 else:
-                    extraction_methods.append("text")
+                    extraction_methods.append("text_extraction")
+                    layout_data_pages.append({})
                 
                 pages_text.append({
                     "page_number": page_num + 1,
@@ -97,8 +119,9 @@ class PDFProcessor:
             enhanced_metadata.update({
                 "page_count": len(pages_text),
                 "extraction_methods": extraction_methods,
-                "has_images": any(m == "ocr" for m in extraction_methods),
-                "total_chars": len(full_text)
+                "has_images": any(m in ["paddle_ocr", "easyocr"] for m in extraction_methods),
+                "total_chars": len(full_text),
+                "paddle_ocr_used": self.use_paddle_ocr and any(m == "paddle_ocr" for m in extraction_methods)
             })
             
             return {
@@ -107,7 +130,9 @@ class PDFProcessor:
                 "chunks": processed["chunks"],
                 "metadata": enhanced_metadata,
                 "num_chunks": processed["num_chunks"],
-                "token_count": processed["token_count"]
+                "token_count": processed["token_count"],
+                "layout_data": layout_data_pages,
+                "ocr_results": ocr_results_pages
             }
             
         except Exception as e:

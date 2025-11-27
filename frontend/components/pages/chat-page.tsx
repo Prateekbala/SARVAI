@@ -104,13 +104,13 @@ export function ChatPage() {
   };
 
   return (
-    <div className="flex gap-6 h-[calc(100vh-8rem)]">
+    <div className="flex gap-6 h-[calc(100vh-8rem)] animate-fade-in-up">
       {/* Conversations Sidebar */}
-      <Card className="w-80 flex flex-col">
+      <Card className="w-80 flex flex-col border-0 shadow-lg">
         <CardContent className="p-4 flex flex-col h-full">
           <Button
             onClick={() => createConversationMutation.mutate()}
-            className="w-full mb-4"
+            className="w-full mb-4 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 shadow-lg hover:shadow-xl transition-all hover:scale-105 border border-red-500"
             disabled={createConversationMutation.isPending}
           >
             <Plus className="mr-2 h-4 w-4" />
@@ -123,10 +123,10 @@ export function ChatPage() {
                 <button
                   key={conv.id}
                   onClick={() => setCurrentConversationId(conv.id)}
-                  className={`w-full text-left p-3 rounded-lg transition-colors ${
+                  className={`w-full text-left p-3 rounded-xl transition-all duration-300 ${
                     currentConversationId === conv.id
-                      ? 'bg-purple-100 dark:bg-purple-900/20 text-purple-900 dark:text-purple-100'
-                      : 'hover:bg-gray-100 dark:hover:bg-gray-800'
+                      ? 'bg-gradient-to-r from-red-900/50 to-orange-900/50 text-white shadow-md border-2 border-red-600'
+                      : 'hover:bg-gray-900 border-2 border-transparent hover:border-red-900/50'
                   }`}
                 >
                   <div className="flex items-start gap-2">
@@ -146,29 +146,29 @@ export function ChatPage() {
       </Card>
 
       {/* Chat Area */}
-      <Card className="flex-1 flex flex-col">
-        <CardContent className="p-6 flex flex-col h-full">
+      <Card className="flex-1 flex flex-col border border-red-900/20 shadow-lg">
+        <CardContent className="p-6 flex flex-col h-full bg-gradient-to-br from-black to-gray-900">
           {currentConversation ? (
             <>
               {/* Messages */}
               <ScrollArea className="flex-1 pr-4" ref={scrollRef}>
                 <div className="space-y-6">
-                  {currentConversation.messages.map((message) => (
-                    <div key={message.id} className="flex gap-4">
-                      <div className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center ${
+                  {currentConversation.messages.map((message, index) => (
+                    <div key={message.id} className="flex gap-4 animate-fade-in-up" style={{ animationDelay: `${index * 50}ms` }}>
+                      <div className={`shrink-0 w-10 h-10 rounded-full flex items-center justify-center shadow-lg ${
                         message.role === 'user'
-                          ? 'bg-purple-100 dark:bg-purple-900/20'
-                          : 'bg-blue-100 dark:bg-blue-900/20'
+                          ? 'bg-gradient-to-br from-red-600 to-red-700'
+                          : 'bg-gradient-to-br from-orange-600 to-red-600'
                       }`}>
                         {message.role === 'user' ? (
-                          <User className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                          <User className="h-5 w-5 text-white" />
                         ) : (
-                          <Bot className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                          <Bot className="h-5 w-5 text-white" />
                         )}
                       </div>
                       <div className="flex-1 space-y-2">
                         <div className="flex items-center gap-2">
-                          <span className="font-medium text-sm">
+                          <span className="font-semibold text-base">
                             {message.role === 'user' ? 'You' : 'AI Assistant'}
                           </span>
                           {message.meta_data?.web_search_used && (
@@ -211,19 +211,23 @@ export function ChatPage() {
               <Separator className="my-4" />
 
               {/* Input */}
-              <form onSubmit={handleSubmit} className="flex gap-2">
+              <form onSubmit={handleSubmit} className="flex gap-3">
                 <Input
                   placeholder="Ask anything about your memories..."
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   disabled={isStreaming}
-                  className="flex-1"
+                  className="flex-1 h-12 text-base border-2 focus:border-red-500 transition-all bg-gray-900/50"
                 />
-                <Button type="submit" disabled={isStreaming || !input.trim()}>
+                <Button 
+                  type="submit" 
+                  disabled={isStreaming || !input.trim()}
+                  className="h-12 px-6 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 shadow-lg hover:shadow-xl transition-all hover:scale-105 border border-red-500"
+                >
                   {isStreaming ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <Loader2 className="h-5 w-5 animate-spin" />
                   ) : (
-                    <Send className="h-4 w-4" />
+                    <Send className="h-5 w-5" />
                   )}
                 </Button>
               </form>

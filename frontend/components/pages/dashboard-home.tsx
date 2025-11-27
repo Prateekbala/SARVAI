@@ -12,7 +12,8 @@ import {
   TrendingUp,
   MessageSquare,
   ArrowRight,
-  Sparkles
+  Sparkles,
+  Upload
 } from 'lucide-react';
 import { useAtom } from 'jotai';
 import { currentPageAtom } from '@/lib/store';
@@ -65,76 +66,92 @@ export function DashboardHome() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in-up">
       {/* Welcome Section */}
-      <div className="bg-linear-to-r from-purple-600 to-blue-600 rounded-lg p-6 text-white">
-        <div className="flex items-start justify-between">
-          <div>
-            <h2 className="text-2xl font-bold mb-2">Welcome to Your Memory Hub</h2>
-            <p className="text-purple-100 mb-4">
-              You have {stats?.total_memories || 0} memories stored and ready to search
+      <div className="relative overflow-hidden bg-gradient-to-br from-black via-gray-900 to-red-950 rounded-2xl p-8 text-white shadow-2xl border border-red-900/20">
+        <div className="absolute inset-0 bg-grid-white/[0.02] bg-[size:20px_20px]" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+        <div className="absolute top-0 right-0 w-96 h-96 bg-red-600/10 rounded-full blur-3xl" />
+        <div className="relative flex items-start justify-between">
+          <div className="space-y-4">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-red-500/10 rounded-full backdrop-blur-sm border border-red-500/30">
+              <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
+              <span className="text-sm font-medium">System Active</span>
+            </div>
+            <h2 className="text-3xl md:text-4xl font-bold tracking-tight">
+              Welcome to Your Memory Hub
+            </h2>
+            <p className="text-gray-300 text-lg max-w-2xl">
+              You have <span className="font-bold text-red-500">{stats?.total_memories || 0}</span> memories stored and ready to search with AI-powered intelligence
             </p>
-            <div className="flex gap-3">
+            <div className="flex gap-3 pt-2">
               <Button
                 onClick={() => setCurrentPage('upload')}
-                className="bg-white text-purple-600 hover:bg-purple-50"
+                className="bg-red-600 text-white hover:bg-red-700 shadow-lg hover:shadow-xl transition-all hover:scale-105 border border-red-500"
               >
+                <FileText className="mr-2 h-4 w-4" />
                 Add Memory
               </Button>
               <Button
                 onClick={() => setCurrentPage('chat')}
                 variant="outline"
-                className="border-white text-white hover:bg-white/20"
+                className="border-red-500/50 text-red-400 hover:bg-red-950/50 backdrop-blur-sm transition-all hover:scale-105"
               >
+                <MessageSquare className="mr-2 h-4 w-4" />
                 Ask AI
               </Button>
             </div>
           </div>
-          <Sparkles className="h-12 w-12 text-purple-200" />
+          <Sparkles className="h-16 w-16 text-red-400/50 animate-float" />
         </div>
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
           {
             label: 'Text Memories',
             value: stats?.memories_by_type.text || 0,
             icon: FileText,
-            color: 'text-blue-600 dark:text-blue-400',
-            bgColor: 'bg-blue-100 dark:bg-blue-900/20',
+            color: 'text-red-400',
+            bgColor: 'bg-gradient-to-br from-red-600 to-red-700',
+            gradient: 'from-red-500/10 to-red-600/10',
           },
           {
             label: 'Images',
             value: stats?.memories_by_type.image || 0,
             icon: Image,
-            color: 'text-purple-600 dark:text-purple-400',
-            bgColor: 'bg-purple-100 dark:bg-purple-900/20',
+            color: 'text-orange-400',
+            bgColor: 'bg-gradient-to-br from-orange-600 to-red-600',
+            gradient: 'from-orange-500/10 to-red-600/10',
           },
           {
             label: 'PDFs',
             value: stats?.memories_by_type.pdf || 0,
             icon: File,
-            color: 'text-green-600 dark:text-green-400',
-            bgColor: 'bg-green-100 dark:bg-green-900/20',
+            color: 'text-yellow-400',
+            bgColor: 'bg-gradient-to-br from-yellow-600 to-orange-600',
+            gradient: 'from-yellow-500/10 to-orange-600/10',
           },
           {
             label: 'Audio Files',
             value: stats?.memories_by_type.audio || 0,
             icon: Mic,
-            color: 'text-orange-600 dark:text-orange-400',
-            bgColor: 'bg-orange-100 dark:bg-orange-900/20',
+            color: 'text-rose-400',
+            bgColor: 'bg-gradient-to-br from-rose-600 to-red-700',
+            gradient: 'from-rose-500/10 to-red-700/10',
           },
-        ].map((stat) => (
-          <Card key={stat.label}>
-            <CardContent className="p-6">
+        ].map((stat, index) => (
+          <Card key={stat.label} className="hover-lift border-0 shadow-lg overflow-hidden group" style={{ animationDelay: `${index * 75}ms` }}>
+            <div className={`absolute inset-0 bg-gradient-to-br ${stat.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-300`} />
+            <CardContent className="p-6 relative">
               <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">{stat.label}</p>
-                  <p className="text-3xl font-bold mt-1">{stat.value}</p>
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-muted-foreground">{stat.label}</p>
+                  <p className="text-4xl font-bold tracking-tight">{stat.value}</p>
                 </div>
-                <div className={`${stat.bgColor} p-3 rounded-lg`}>
-                  <stat.icon className={`h-6 w-6 ${stat.color}`} />
+                <div className={`${stat.bgColor} p-4 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                  <stat.icon className="h-7 w-7 text-white" />
                 </div>
               </div>
             </CardContent>
@@ -145,14 +162,15 @@ export function DashboardHome() {
       {/* Recent Activity & Conversations */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Memories */}
-        <Card>
-          <CardHeader>
+        <Card className="hover-lift border-0 shadow-lg">
+          <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle>Recent Memories</CardTitle>
+              <CardTitle className="text-xl">Recent Memories</CardTitle>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setCurrentPage('memories')}
+                className="hover:bg-purple-100 dark:hover:bg-purple-900/20 transition-colors"
               >
                 View All
                 <ArrowRight className="ml-2 h-4 w-4" />
@@ -161,17 +179,22 @@ export function DashboardHome() {
             <CardDescription>Your latest uploaded content</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {recentMemories?.memories.map((memory) => {
+            <div className="space-y-2">
+              {recentMemories?.memories.map((memory, index) => {
                 const Icon = contentTypeIcons[memory.content_type as keyof typeof contentTypeIcons];
                 return (
-                  <div key={memory.id} className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                    <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg">
-                      <Icon className="h-4 w-4" />
+                  <div 
+                    key={memory.id} 
+                    className="group flex items-start gap-3 p-4 rounded-xl hover:bg-gradient-to-r hover:from-red-950/30 hover:to-gray-900/50 transition-all duration-300 cursor-pointer border border-transparent hover:border-red-900/50 shadow-sm hover:shadow-md"
+                    style={{ animationDelay: `${index * 50}ms` }}
+                  >
+                    <div className="p-2.5 bg-gradient-to-br from-gray-800 to-gray-900 rounded-xl group-hover:scale-110 transition-transform duration-300 shadow-sm border border-red-900/20">
+                      <Icon className="h-5 w-5 text-gray-700 dark:text-gray-300" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{memory.content.slice(0, 100)}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      <p className="text-sm font-medium leading-relaxed line-clamp-2">{memory.content.slice(0, 100)}</p>
+                      <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1">
+                        <span className="w-1 h-1 rounded-full bg-green-500" />
                         {new Date(memory.created_at).toLocaleDateString()}
                       </p>
                     </div>
@@ -179,23 +202,27 @@ export function DashboardHome() {
                 );
               })}
               {(!recentMemories?.memories || recentMemories.memories.length === 0) && (
-                <p className="text-center text-gray-500 dark:text-gray-400 py-8">
-                  No memories yet. Start by uploading content!
-                </p>
+                <div className="text-center py-12">
+                  <FileText className="h-12 w-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" />
+                  <p className="text-sm text-muted-foreground">
+                    No memories yet. Start by uploading content!
+                  </p>
+                </div>
               )}
             </div>
           </CardContent>
         </Card>
 
         {/* Recent Conversations */}
-        <Card>
-          <CardHeader>
+        <Card className="hover-lift border-0 shadow-lg">
+          <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
-              <CardTitle>Recent Conversations</CardTitle>
+              <CardTitle className="text-xl">Recent Conversations</CardTitle>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setCurrentPage('chat')}
+                className="hover:bg-purple-100 dark:hover:bg-purple-900/20 transition-colors"
               >
                 View All
                 <ArrowRight className="ml-2 h-4 w-4" />
@@ -204,28 +231,33 @@ export function DashboardHome() {
             <CardDescription>Your AI chat history</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {conversations?.slice(0, 5).map((conversation) => (
+            <div className="space-y-2">
+              {conversations?.slice(0, 5).map((conversation, index) => (
                 <div
                   key={conversation.id}
-                  className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
+                  className="group flex items-start gap-3 p-4 rounded-xl hover:bg-gradient-to-r hover:from-red-950/30 hover:to-orange-950/30 transition-all duration-300 cursor-pointer border border-transparent hover:border-red-900/50 shadow-sm hover:shadow-md"
                   onClick={() => setCurrentPage('chat')}
+                  style={{ animationDelay: `${index * 50}ms` }}
                 >
-                  <div className="p-2 bg-purple-100 dark:bg-purple-900/20 rounded-lg">
-                    <MessageSquare className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                  <div className="p-2.5 bg-gradient-to-br from-red-900/50 to-orange-900/50 rounded-xl group-hover:scale-110 transition-transform duration-300 shadow-sm border border-red-800/30">
+                    <MessageSquare className="h-5 w-5 text-red-400" />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{conversation.title}</p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    <p className="text-xs text-muted-foreground mt-1.5 flex items-center gap-1">
+                      <span className="w-1 h-1 rounded-full bg-purple-500" />
                       {new Date(conversation.updated_at).toLocaleDateString()}
                     </p>
                   </div>
                 </div>
               ))}
               {(!conversations || conversations.length === 0) && (
-                <p className="text-center text-gray-500 dark:text-gray-400 py-8">
-                  No conversations yet. Start chatting with AI!
-                </p>
+                <div className="text-center py-12">
+                  <MessageSquare className="h-12 w-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" />
+                  <p className="text-sm text-muted-foreground">
+                    No conversations yet. Start chatting with AI!
+                  </p>
+                </div>
               )}
             </div>
           </CardContent>
@@ -233,36 +265,43 @@ export function DashboardHome() {
       </div>
 
       {/* Quick Actions */}
-      <Card>
+      <Card className="hover-lift border border-red-900/20 shadow-lg overflow-hidden bg-gradient-to-br from-black to-gray-900">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-gradient-to-br from-red-600/10 to-orange-600/10 rounded-full blur-3xl -z-10" />
         <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
+          <CardTitle className="text-xl">Quick Actions</CardTitle>
           <CardDescription>Common tasks to get you started</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Button
               variant="outline"
-              className="h-auto flex-col gap-2 p-4"
+              className="h-auto flex-col gap-3 p-6 hover:bg-gradient-to-br hover:from-red-950/50 hover:to-red-900/50 border-2 border-red-900/30 hover:border-red-600 transition-all duration-300 group"
               onClick={() => setCurrentPage('upload')}
             >
-              <TrendingUp className="h-6 w-6" />
-              <span>Upload Content</span>
+              <div className="p-3 bg-gradient-to-br from-red-600 to-red-700 rounded-xl group-hover:scale-110 transition-transform duration-300 shadow-lg shadow-red-900/50">
+                <Upload className="h-6 w-6 text-white" />
+              </div>
+              <span className="font-semibold">Upload Content</span>
             </Button>
             <Button
               variant="outline"
-              className="h-auto flex-col gap-2 p-4"
+              className="h-auto flex-col gap-3 p-6 hover:bg-gradient-to-br hover:from-orange-950/50 hover:to-orange-900/50 border-2 border-orange-900/30 hover:border-orange-600 transition-all duration-300 group"
               onClick={() => setCurrentPage('search')}
             >
-              <TrendingUp className="h-6 w-6" />
-              <span>Search Memories</span>
+              <div className="p-3 bg-gradient-to-br from-orange-600 to-red-600 rounded-xl group-hover:scale-110 transition-transform duration-300 shadow-lg shadow-orange-900/50">
+                <TrendingUp className="h-6 w-6 text-white" />
+              </div>
+              <span className="font-semibold">Search Memories</span>
             </Button>
             <Button
               variant="outline"
-              className="h-auto flex-col gap-2 p-4"
+              className="h-auto flex-col gap-3 p-6 hover:bg-gradient-to-br hover:from-rose-950/50 hover:to-rose-900/50 border-2 border-rose-900/30 hover:border-rose-600 transition-all duration-300 group"
               onClick={() => setCurrentPage('chat')}
             >
-              <MessageSquare className="h-6 w-6" />
-              <span>Ask AI</span>
+              <div className="p-3 bg-gradient-to-br from-rose-600 to-red-700 rounded-xl group-hover:scale-110 transition-transform duration-300 shadow-lg shadow-rose-900/50">
+                <MessageSquare className="h-6 w-6 text-white" />
+              </div>
+              <span className="font-semibold">Ask AI</span>
             </Button>
           </div>
         </CardContent>

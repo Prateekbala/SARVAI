@@ -49,16 +49,16 @@ export function SearchPage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold mb-2">Search Memories</h2>
-        <p className="text-gray-600 dark:text-gray-400">
+    <div className="max-w-6xl mx-auto space-y-6 animate-fade-in-up">
+      <div className="space-y-2">
+        <h2 className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-red-500 to-orange-500">Search Memories</h2>
+        <p className="text-muted-foreground text-lg">
           Find anything using semantic search
         </p>
       </div>
 
       {/* Search Form */}
-      <Card>
+      <Card className="border-0 shadow-lg hover-lift">
         <CardContent className="pt-6">
           <form onSubmit={handleSearch} className="space-y-4">
             <div className="flex gap-4">
@@ -67,11 +67,11 @@ export function SearchPage() {
                   placeholder="What are you looking for?"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
-                  className="h-12 text-lg"
+                  className="h-14 text-lg border-2 focus:border-red-500 transition-all bg-gray-900/50"
                 />
               </div>
               <Select value={contentType} onValueChange={setContentType}>
-                <SelectTrigger className="w-40 h-12">
+                <SelectTrigger className="w-44 h-14 border-2">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -82,12 +82,12 @@ export function SearchPage() {
                   <SelectItem value="audio">Audio</SelectItem>
                 </SelectContent>
               </Select>
-              <Button type="submit" size="lg" disabled={isLoading}>
+              <Button type="submit" size="lg" disabled={isLoading} className="h-14 px-8 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 shadow-lg hover:shadow-xl transition-all hover:scale-105 border border-red-500">
                 {isLoading ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <Loader2 className="h-6 w-6 animate-spin" />
                 ) : (
                   <>
-                    <Search className="mr-2 h-5 w-5" />
+                    <Search className="mr-2 h-6 w-6" />
                     Search
                   </>
                 )}
@@ -113,27 +113,34 @@ export function SearchPage() {
           </div>
 
           <div className="space-y-4">
-            {data.results.map((result) => {
+            {data.results.map((result, index) => {
               const Icon = contentTypeIcons[result.content_type as keyof typeof contentTypeIcons];
               return (
-                <Card key={result.memory_id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-6">
+                <Card key={result.memory_id} className="hover-lift border-0 shadow-lg overflow-hidden group" style={{ animationDelay: `${index * 50}ms` }}>
+                  <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <CardContent className="p-6 relative">
                     <div className="flex items-start gap-4">
-                      <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg shrink-0">
-                        <Icon className="h-6 w-6" />
+                      <div className="p-4 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700 rounded-xl shadow-md group-hover:scale-110 transition-transform duration-300 shrink-0">
+                        <Icon className="h-7 w-7 text-gray-700 dark:text-gray-300" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-4 mb-2">
                           <Badge variant="secondary" className="capitalize">
                             {result.content_type}
                           </Badge>
-                          <Badge className={getScoreColor(result.similarity)}>
-                            {Math.round(result.similarity * 100)}% match
+                          <Badge className={getScoreColor(result.similarity_score)}>
+                            {Math.round(result.similarity_score * 100)}% match
                           </Badge>
                         </div>
                         <p className="text-sm leading-relaxed mb-2">
-                          {result.content.slice(0, 400)}
-                          {result.content.length > 400 && '...'}
+                          {result.chunk_text ? (
+                            <>
+                              {result.chunk_text.slice(0, 400)}
+                              {result.chunk_text.length > 400 && '...'}
+                            </>
+                          ) : (
+                            <span className="italic text-gray-500">No content preview available</span>
+                          )}
                         </p>
                         <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
                           <span>{new Date(result.created_at).toLocaleDateString()}</span>

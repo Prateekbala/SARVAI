@@ -28,10 +28,10 @@ export function TimelinePage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold mb-2">Memory Timeline</h2>
-        <p className="text-gray-600 dark:text-gray-400">
+    <div className="max-w-4xl mx-auto space-y-6 animate-fade-in-up">
+      <div className="space-y-2">
+        <h2 className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-red-500 to-orange-500">Memory Timeline</h2>
+        <p className="text-muted-foreground text-lg">
           View your memories organized by date
         </p>
       </div>
@@ -41,9 +41,11 @@ export function TimelinePage() {
           {data.timeline.map((group) => (
             <div key={group.date} className="relative">
               {/* Date Header */}
-              <div className="sticky top-20 z-10 flex items-center gap-3 mb-4 bg-white/80 dark:bg-gray-950/80 backdrop-blur-md py-2">
-                <Calendar className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                <h3 className="text-lg font-semibold">
+              <div className="sticky top-20 z-10 flex items-center gap-3 mb-4 bg-gradient-to-r from-black to-gray-900 backdrop-blur-md py-3 px-4 rounded-xl border border-red-900/30 shadow-lg">
+                <div className="p-2 bg-gradient-to-br from-red-600 to-red-700 rounded-lg shadow-lg shadow-red-900/50">
+                  <Calendar className="h-5 w-5 text-white" />
+                </div>
+                <h3 className="text-xl font-bold">
                   {new Date(group.date).toLocaleDateString('en-US', {
                     weekday: 'long',
                     year: 'numeric',
@@ -55,12 +57,12 @@ export function TimelinePage() {
               </div>
 
               {/* Memories */}
-              <div className="space-y-3 pl-8 border-l-2 border-gray-200 dark:border-gray-800">
-                {group.memories.map((memory) => {
+              <div className="space-y-3 pl-8 border-l-2 border-red-900">
+                {group.memories.map((memory, index) => {
                   const Icon = contentTypeIcons[memory.content_type as keyof typeof contentTypeIcons];
                   return (
-                    <Card key={memory.id} className="relative">
-                      <div className="absolute -left-8.5 top-6 w-4 h-4 bg-purple-600 dark:bg-purple-400 rounded-full border-4 border-white dark:border-gray-950" />
+                    <Card key={memory.id} className="relative hover-lift border border-red-900/20 shadow-md bg-gradient-to-br from-black to-gray-900" style={{ animationDelay: `${index * 50}ms` }}>
+                      <div className="absolute -left-9 top-6 w-5 h-5 bg-gradient-to-br from-red-600 to-red-700 rounded-full border-4 border-black shadow-lg shadow-red-900/50" />
                       <CardContent className="p-4">
                         <div className="flex items-start gap-3">
                           <div className="p-2 bg-gray-100 dark:bg-gray-800 rounded-lg shrink-0">

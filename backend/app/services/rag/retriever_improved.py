@@ -1,5 +1,7 @@
 from typing import List, Dict, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert
 import logging
 
 from app.services.embeddings.embedding_service import embedding_service
@@ -11,7 +13,8 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-class Retriever:
+class RetrieverImproved:
+    
     def __init__(self):
         self.top_k = settings.RAG_TOP_K
         self.min_similarity = settings.RAG_MIN_SIMILARITY
@@ -38,7 +41,7 @@ class Retriever:
         
         filtered_results = [
             r for r in local_results 
-            if r.get("hybrid_score", 0) >= max(self.min_similarity, 0.5)
+            if r.get("hybrid_score", 0) >= self.min_similarity
         ]
         
         filtered_results = sorted(
@@ -50,11 +53,9 @@ class Retriever:
         logger.info(f"Retrieval: {len(filtered_results)} results")
         
         web_results = []
-        # Only use web search if memory results are empty or low confidence
         if enable_web and (not filtered_results or len(filtered_results) < 2):
             try:
                 web_results = await self._search_web(db, query, top_k=2)
-                logger.info(f"Web search enabled due to limited memory results")
             except Exception as e:
                 logger.warning(f"Web search failed: {e}")
         
@@ -130,8 +131,6 @@ class Retriever:
         return web_results
     
     async def _get_cached_web_source(self, db: AsyncSession, url: str) -> Optional[WebSource]:
-        from sqlalchemy import select
-        
         result = await db.execute(
             select(WebSource).where(WebSource.url == url)
         )
@@ -145,8 +144,6 @@ class Retriever:
         content: str,
         embedding: List[float]
     ):
-        from sqlalchemy.dialects.postgresql import insert
-        
         stmt = insert(WebSource).values(
             url=url,
             title=title,
@@ -159,4 +156,4 @@ class Retriever:
         await db.commit()
         logger.debug(f"Cached web source: {url}")
 
-retriever = Retriever()
+retriever_improved = RetrieverImproved()

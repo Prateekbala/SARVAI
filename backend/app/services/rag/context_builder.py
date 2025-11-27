@@ -21,32 +21,59 @@ class ContextBuilder:
         self,
         results: List[Dict],
         max_context_tokens: Optional[int] = None,
-        include_metadata: bool = True
+        include_metadata: bool = True,
+        separate_web: bool = True
     ) -> str:
         max_tokens = max_context_tokens or (self.max_tokens // 2)
+        
+        # Separate memory results from web results
+        memory_results = [r for r in results if r.get("content_type") != "web"]
+        web_results = [r for r in results if r.get("content_type") == "web"]
         
         context_parts = []
         current_tokens = 0
         
-        seen_content = set()
+        # Process memory results FIRST with higher priority
+        if memory_results:
+            context_parts.append("=== FROM YOUR MEMORY ===\n")
+            seen_content = set()
+            
+            for i, result in enumerate(memory_results):
+                chunk_text = result.get("chunk_text", "")
+                
+                if not chunk_text or chunk_text in seen_content:
+                    continue
+                
+                seen_content.add(chunk_text)
+                
+                context_block = self._format_result(result, i + 1, include_metadata)
+                block_tokens = self.count_tokens(context_block)
+                
+                if current_tokens + block_tokens > max_tokens * 0.8:  # Reserve 20% for web results
+                    logger.info(f"Memory context limit reached at {i+1}/{len(memory_results)} results")
+                    break
+                
+                context_parts.append(context_block)
+                current_tokens += block_tokens
         
-        for i, result in enumerate(results):
-            chunk_text = result.get("chunk_text", "")
+        # Add web results if enabled and space available
+        if separate_web and web_results and current_tokens < max_tokens:
+            context_parts.append("\n\n=== FROM WEB SEARCH ===\n")
             
-            if not chunk_text or chunk_text in seen_content:
-                continue
-            
-            seen_content.add(chunk_text)
-            
-            context_block = self._format_result(result, i + 1, include_metadata)
-            block_tokens = self.count_tokens(context_block)
-            
-            if current_tokens + block_tokens > max_tokens:
-                logger.info(f"Context limit reached at {i+1}/{len(results)} results")
-                break
-            
-            context_parts.append(context_block)
-            current_tokens += block_tokens
+            for i, result in enumerate(web_results):
+                chunk_text = result.get("chunk_text", "")
+                
+                if not chunk_text:
+                    continue
+                
+                context_block = self._format_result(result, i + 1, include_metadata)
+                block_tokens = self.count_tokens(context_block)
+                
+                if current_tokens + block_tokens > max_tokens:
+                    break
+                
+                context_parts.append(context_block)
+                current_tokens += block_tokens
         
         if not context_parts:
             logger.warning("No context built from results")
@@ -85,14 +112,27 @@ class ContextBuilder:
         query: str,
         context: str,
         conversation_history: Optional[List[Dict]] = None,
-        system_prompt: Optional[str] = None
+        system_prompt: Optional[str] = None,
+        has_memory: bool = True
     ) -> List[Dict[str, str]]:
         messages = []
         
         if not system_prompt:
-            system_prompt = """You are a helpful AI assistant with access to the user's personal memory.
-Answer questions based on the provided context. If the context doesn't contain relevant information, say so clearly.
-Always cite your sources using [Source N] notation."""
+            if has_memory and context.strip():
+                system_prompt = """You are a helpful AI assistant with access to the user's personal memory.
+
+IMPORTANT INSTRUCTIONS:
+1. You MUST prioritize answering based ONLY on the provided context from the user's memory.
+2. Do NOT provide general knowledge answers. If the memory contains relevant information, use ONLY that.
+3. If asked something NOT in the memory, clearly say "This information is not in your memory" - do NOT supplement with general knowledge.
+4. Always cite your sources using [Source N] notation for every fact you use.
+5. Your answers should be grounded entirely in the provided memory context.
+
+The context below contains all the information you should reference."""
+            else:
+                system_prompt = """You are a helpful AI assistant with access to the user's personal memory.
+The user's memory is currently empty or doesn't contain relevant information for this query.
+You can provide general knowledge answers, but mention that they are NOT from their memory."""
         
         messages.append({"role": "system", "content": system_prompt})
         

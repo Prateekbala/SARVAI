@@ -35,67 +35,71 @@ export function AnalyticsPage() {
   const activityData = stats?.recent_activity || [];
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold mb-2">Analytics</h2>
-        <p className="text-gray-600 dark:text-gray-400">
+    <div className="max-w-7xl mx-auto space-y-6 animate-fade-in-up">
+      <div className="space-y-2">
+        <h2 className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-red-500 to-orange-500">Analytics</h2>
+        <p className="text-muted-foreground text-lg">
           Insights into your memory usage and patterns
         </p>
       </div>
 
       {/* Stats Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <Card className="hover-lift border border-red-900/20 shadow-lg overflow-hidden group bg-gradient-to-br from-black to-gray-900">
+          <div className="absolute inset-0 bg-gradient-to-br from-red-500/10 to-red-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          <CardContent className="p-6 relative">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Total Memories</p>
-                <p className="text-3xl font-bold mt-1">{stats?.total_memories || 0}</p>
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-muted-foreground">Total Memories</p>
+                <p className="text-4xl font-bold tracking-tight">{stats?.total_memories || 0}</p>
               </div>
-              <div className="p-3 bg-blue-100 dark:bg-blue-900/20 rounded-lg">
-                <BarChart3 className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+              <div className="p-4 bg-gradient-to-br from-red-600 to-red-700 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300 shadow-red-900/50">
+                <BarChart3 className="h-7 w-7 text-white" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-6">
+        <Card className="hover-lift border border-orange-900/20 shadow-lg overflow-hidden group bg-gradient-to-br from-black to-gray-900">
+          <div className="absolute inset-0 bg-gradient-to-br from-orange-500/10 to-orange-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          <CardContent className="p-6 relative">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Conversations</p>
-                <p className="text-3xl font-bold mt-1">{stats?.total_conversations || 0}</p>
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-muted-foreground">Conversations</p>
+                <p className="text-4xl font-bold tracking-tight">{stats?.total_conversations || 0}</p>
               </div>
-              <div className="p-3 bg-purple-100 dark:bg-purple-900/20 rounded-lg">
-                <TrendingUp className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+              <div className="p-4 bg-gradient-to-br from-orange-600 to-red-600 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300 shadow-orange-900/50">
+                <TrendingUp className="h-7 w-7 text-white" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-6">
+        <Card className="hover-lift border border-yellow-900/20 shadow-lg overflow-hidden group bg-gradient-to-br from-black to-gray-900">
+          <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/10 to-yellow-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          <CardContent className="p-6 relative">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Messages</p>
-                <p className="text-3xl font-bold mt-1">{stats?.total_messages || 0}</p>
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-muted-foreground">Messages</p>
+                <p className="text-4xl font-bold tracking-tight">{stats?.total_messages || 0}</p>
               </div>
-              <div className="p-3 bg-green-100 dark:bg-green-900/20 rounded-lg">
-                <FileText className="h-6 w-6 text-green-600 dark:text-green-400" />
+              <div className="p-4 bg-gradient-to-br from-yellow-600 to-orange-600 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300 shadow-yellow-900/50">
+                <FileText className="h-7 w-7 text-white" />
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-6">
+        <Card className="hover-lift border border-rose-900/20 shadow-lg overflow-hidden group bg-gradient-to-br from-black to-gray-900">
+          <div className="absolute inset-0 bg-gradient-to-br from-rose-500/10 to-rose-600/10 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+          <CardContent className="p-6 relative">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 dark:text-gray-400">Storage Used</p>
-                <p className="text-3xl font-bold mt-1">{stats?.storage_used_mb.toFixed(1) || 0} MB</p>
+              <div className="space-y-2">
+                <p className="text-sm font-medium text-muted-foreground">Storage Used</p>
+                <p className="text-4xl font-bold tracking-tight">{stats?.storage_used_mb.toFixed(1) || 0} MB</p>
               </div>
-              <div className="p-3 bg-orange-100 dark:bg-orange-900/20 rounded-lg">
-                <FileText className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+              <div className="p-4 bg-gradient-to-br from-rose-600 to-red-700 rounded-xl shadow-lg group-hover:scale-110 transition-transform duration-300 shadow-rose-900/50">
+                <FileText className="h-7 w-7 text-white" />
               </div>
             </div>
           </CardContent>
@@ -105,9 +109,9 @@ export function AnalyticsPage() {
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Content Type Distribution */}
-        <Card>
+        <Card className="hover-lift border-0 shadow-lg">
           <CardHeader>
-            <CardTitle>Content Type Distribution</CardTitle>
+            <CardTitle className="text-xl">Content Type Distribution</CardTitle>
             <CardDescription>Breakdown of your memories by type</CardDescription>
           </CardHeader>
           <CardContent>
@@ -134,9 +138,9 @@ export function AnalyticsPage() {
         </Card>
 
         {/* Recent Activity */}
-        <Card>
+        <Card className="hover-lift border-0 shadow-lg">
           <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
+            <CardTitle className="text-xl">Recent Activity</CardTitle>
             <CardDescription>Memories created over time</CardDescription>
           </CardHeader>
           <CardContent>
@@ -154,24 +158,24 @@ export function AnalyticsPage() {
       </div>
 
       {/* Popular Searches */}
-      <Card>
+      <Card className="hover-lift border-0 shadow-lg">
         <CardHeader>
-          <CardTitle>Popular Searches</CardTitle>
+          <CardTitle className="text-xl">Popular Searches</CardTitle>
           <CardDescription>Your most frequent search queries</CardDescription>
         </CardHeader>
         <CardContent>
           {popularSearches && popularSearches.searches.length > 0 ? (
             <div className="space-y-3">
               {popularSearches.searches.map((search, index) => (
-                <div key={index} className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                <div key={index} className="group flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-800/80 rounded-xl hover:from-purple-50 hover:to-blue-50 dark:hover:from-purple-900/20 dark:hover:to-blue-900/20 transition-all duration-300 border border-transparent hover:border-purple-200 dark:hover:border-purple-700">
                   <div className="flex-1">
-                    <p className="font-medium">{search.query}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <p className="font-semibold text-base">{search.query}</p>
+                    <p className="text-sm text-muted-foreground mt-1">
                       Last searched: {new Date(search.last_searched).toLocaleDateString()}
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600 dark:text-gray-400">{search.count} times</span>
+                    <span className="text-sm font-medium text-muted-foreground">{search.count} times</span>
                   </div>
                 </div>
               ))}

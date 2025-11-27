@@ -1,7 +1,6 @@
 from sqlalchemy import Column, String, DateTime, Integer, ForeignKey, Text, ARRAY
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import relationship
-from pgvector.sqlalchemy import Vector
 from datetime import datetime
 import uuid
 from app.database import Base
@@ -9,9 +8,7 @@ from app.database import Base
 class User(Base):
     __tablename__ = "users"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    email = Column(String(255), unique=True, nullable=False, index=True)
-    password_hash = Column(String(255))
+    namespace = Column(String(255), primary_key=True, unique=True, nullable=False, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     
     # Relationships
@@ -23,7 +20,7 @@ class Memory(Base):
     __tablename__ = "memories"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    namespace = Column(String(255), ForeignKey("users.namespace"), nullable=False, index=True)
     content_type = Column(String(50), nullable=False)  # 'text', 'image', 'pdf', 'audio'
     content = Column(Text)
     meta_data = Column(JSONB, default={})  # Renamed from 'metadata' to avoid SQLAlchemy reserved word
@@ -35,6 +32,10 @@ class Memory(Base):
     importance_score = Column(Integer, default=50)  # 0-100 scale
     last_accessed = Column(DateTime, default=datetime.utcnow, index=True)
     
+    # OCR and Layout Parsing
+    ocr_text = Column(Text, nullable=True)  # Enhanced OCR extracted text
+    layout_data = Column(JSONB, nullable=True)  # Layout structure and positioning data
+    
     # Relationships
     user = relationship("User", back_populates="memories")
     embeddings = relationship("Embedding", back_populates="memory", cascade="all, delete-orphan")
@@ -45,10 +46,16 @@ class Embedding(Base):
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     memory_id = Column(UUID(as_uuid=True), ForeignKey("memories.id"), nullable=False, index=True)
-    embedding = Column(Vector(512))  # 512 for CLIP, will pad smaller embeddings
+    # embedding is now stored in Qdrant, not in PostgreSQL
     chunk_text = Column(Text)
     chunk_index = Column(Integer, default=0)
+    # qdrant_point_id stores the ID of the point in Qdrant collection
+    qdrant_point_id = Column(String(255), unique=True, nullable=False, index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Re-ranking and BM25 scores
+    bm25_score = Column(Integer, default=0, nullable=True)  # BM25 relevance score
+    re_ranking_score = Column(Integer, default=0, nullable=True)  # Cross-Encoder re-ranking score
     
     # Relationships
     memory = relationship("Memory", back_populates="embeddings")
@@ -57,7 +64,7 @@ class Conversation(Base):
     __tablename__ = "conversations"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, index=True)
+    namespace = Column(String(255), ForeignKey("users.namespace"), nullable=False, index=True)
     title = Column(String(255))
     created_at = Column(DateTime, default=datetime.utcnow, index=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -84,7 +91,8 @@ class WebSource(Base):
     url = Column(String(1000), unique=True, nullable=False, index=True)
     title = Column(String(500))
     content = Column(Text)
-    embedding = Column(Vector(512))
+    # embedding is now stored in Qdrant
+    qdrant_point_id = Column(String(255), unique=True, nullable=True, index=True)
     scraped_at = Column(DateTime, default=datetime.utcnow)
     meta_data = Column(JSONB, default={})
 
@@ -92,7 +100,7 @@ class UserPreference(Base):
     __tablename__ = "user_preferences"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), unique=True, nullable=False, index=True)
+    namespace = Column(String(255), ForeignKey("users.namespace"), unique=True, nullable=False, index=True)
     boost_topics = Column(ARRAY(String), default=[])
     suppress_topics = Column(ARRAY(String), default=[])
     search_preferences = Column(JSONB, default={})
@@ -120,9 +128,10 @@ class MemorySummary(Base):
     __tablename__ = "memory_summaries"
     
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    namespace = Column(String(255), ForeignKey("users.namespace", ondelete="CASCADE"), nullable=False, index=True)
     summary_text = Column(Text, nullable=False)
-    summary_embedding = Column(Vector(512), nullable=False)
+    # summary_embedding is now stored in Qdrant
+    qdrant_point_id = Column(String(255), unique=True, nullable=False, index=True)
     source_memory_ids = Column(ARRAY(String), nullable=False)  # Array of memory UUIDs
     memory_count = Column(Integer, nullable=False)
     date_range_start = Column(DateTime, nullable=False, index=True)

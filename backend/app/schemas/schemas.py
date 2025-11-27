@@ -1,25 +1,22 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 from uuid import UUID
 
 # User Schemas
 class UserCreate(BaseModel):
-    email: EmailStr
-    password: str = Field(..., min_length=6, description="Password (min 6 characters)")
+    namespace: str = Field(..., min_length=1, max_length=255, description="Unique namespace identifier")
 
 class UserLogin(BaseModel):
-    email: EmailStr
-    password: str
+    namespace: str = Field(..., min_length=1, description="Namespace identifier")
 
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
-    user_id: UUID
+    namespace: str
 
 class UserResponse(BaseModel):
-    id: UUID
-    email: str
+    namespace: str
     created_at: datetime
     
     class Config:
@@ -41,12 +38,16 @@ class AudioMemoryRequest(BaseModel):
 
 class MemoryResponse(BaseModel):
     id: UUID
-    user_id: UUID
+    namespace: str
     content_type: str
     content: Optional[str]
     metadata: Dict[str, Any]
     file_path: Optional[str]
     created_at: datetime
+    
+    # OCR and Layout data
+    ocr_text: Optional[str] = None
+    layout_data: Optional[Dict[str, Any]] = None
     
     class Config:
         from_attributes = True
@@ -56,12 +57,14 @@ class MemoryResponse(BaseModel):
         """Convert database model to response schema"""
         return cls(
             id=memory.id,
-            user_id=memory.user_id,
+            namespace=memory.namespace,
             content_type=memory.content_type,
             content=memory.content,
             metadata=memory.meta_data or {},  # Convert meta_data to metadata
             file_path=memory.file_path,
-            created_at=memory.created_at
+            created_at=memory.created_at,
+            ocr_text=memory.ocr_text,
+            layout_data=memory.layout_data
         )
 
 class MemoryListResponse(BaseModel):
@@ -83,6 +86,12 @@ class SearchResult(BaseModel):
     similarity_score: float
     metadata: Dict[str, Any]
     created_at: datetime
+    
+    # Re-ranking and Hybrid search scores
+    bm25_score: Optional[float] = None
+    re_ranking_score: Optional[float] = None
+    hybrid_score: Optional[float] = None
+    rank: Optional[int] = None
 
 class SearchResponse(BaseModel):
     results: List[SearchResult]
@@ -124,7 +133,7 @@ class ConversationCreate(BaseModel):
 
 class ConversationResponse(BaseModel):
     id: UUID
-    user_id: UUID
+    namespace: str
     title: Optional[str]
     created_at: datetime
     updated_at: datetime
@@ -169,7 +178,7 @@ class PreferencesUpdate(BaseModel):
 
 class PreferencesResponse(BaseModel):
     id: UUID
-    user_id: UUID
+    namespace: str
     boost_topics: List[str]
     suppress_topics: List[str]
     search_preferences: Dict[str, Any]
@@ -210,3 +219,71 @@ class PopularSearch(BaseModel):
 
 class PopularSearchesResponse(BaseModel):
     searches: List[PopularSearch]
+
+
+# OCR and Advanced Processing Schemas
+class OCRResultBBox(BaseModel):
+    points: List[List[float]]
+    text: str
+    confidence: float
+
+class OCRResultParagraph(BaseModel):
+    text: str
+    confidence: float
+    bboxes: List[OCRResultBBox]
+
+class OCRPageResult(BaseModel):
+    page_number: int
+    text: str
+    confidence: float
+    paragraphs: List[OCRResultParagraph]
+    layout: Dict[str, Any] = {}
+    bboxes: List[OCRResultBBox] = []
+
+class PDFExtractionResult(BaseModel):
+    full_text: str
+    num_chunks: int
+    token_count: int
+    metadata: Dict[str, Any]
+    extraction_methods: List[str]
+    layout_data: List[Dict[str, Any]]
+    ocr_results: List[Dict[str, Any]]
+
+# Re-ranking Schemas
+class RerankedResult(BaseModel):
+    id: str
+    text: str
+    score: float
+    rank: int
+
+class RerankerResponse(BaseModel):
+    query: str
+    results: List[RerankedResult]
+    total_results: int
+
+# Advanced Search Schemas
+class AdvancedSearchRequest(BaseModel):
+    query: str = Field(..., min_length=1)
+    top_k: int = Field(default=10, ge=1, le=50)
+    content_type: Optional[str] = None
+    fusion_method: str = Field(default="weighted", description="'weighted' or 'rrf'")
+    use_reranking: bool = Field(default=True, description="Use Cross-Encoder re-ranking")
+
+class AdvancedSearchResult(BaseModel):
+    memory_id: UUID
+    content_type: str
+    chunk_text: str
+    vector_similarity: float
+    bm25_score: Optional[float] = None
+    re_ranking_score: Optional[float] = None
+    hybrid_score: float
+    rank: int
+    metadata: Dict[str, Any]
+    created_at: datetime
+
+class AdvancedSearchResponse(BaseModel):
+    results: List[AdvancedSearchResult]
+    query: str
+    total_results: int
+    fusion_method: str
+    reranking_used: bool

@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     DATABASE_URL: str
     DB_ECHO: bool = False
     
+    # Qdrant Vector Database
+    QDRANT_URL: str = "http://localhost:6333"
+    QDRANT_TIMEOUT: int = 30
+    
     # MinIO
     MINIO_ENDPOINT: str
     MINIO_ACCESS_KEY: str

@@ -21,8 +21,14 @@ async def lifespan(app: FastAPI):
     try:
         await init_db()
         logger.info("Database initialized successfully")
+        
+        # Initialize Qdrant collections
+        from app.services.embeddings.qdrant_manager import qdrant_manager
+        await qdrant_manager.initialize_collections()
+        logger.info("Qdrant collections initialized successfully")
+        
     except Exception as e:
-        logger.error(f"Database initialization failed: {e}")
+        logger.error(f"Initialization failed: {e}")
         raise
     
     yield

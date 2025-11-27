@@ -15,7 +15,8 @@ from app.schemas.schemas import (
     ConversationResponse, ConversationWithMessages, MessageResponse,
     WebSearchRequest, WebSearchResponse, WebSearchResult,
     PreferencesUpdate, PreferencesResponse, UserStatsResponse,
-    TimelineResponse, TimelineGroup, PopularSearchesResponse, PopularSearch
+    TimelineResponse, TimelineGroup, PopularSearchesResponse, PopularSearch,
+    AdvancedSearchRequest, AdvancedSearchResponse, AdvancedSearchResult
 )
 from app.services.storage.storage_service import storage_service
 from app.services.storage.minio_service import minio_service
@@ -25,10 +26,12 @@ from app.services.ingestion.pdf_processor import pdf_processor
 from app.services.ingestion.audio_processor import audio_processor
 from app.services.embeddings.embedding_service import embedding_service
 from app.services.auth.auth_service import auth_service
-from app.services.auth.auth_middleware import get_current_user_id, get_optional_user_id
+from app.services.auth.auth_middleware import get_current_user_namespace, get_optional_user_namespace
 from app.services.personalization.preferences_service import preferences_service
 from app.services.personalization.reranking_service import reranking_service
 from app.services.analytics.analytics_service import analytics_service
+from app.services.retrieval.advanced_hybrid_search import advanced_hybrid_search
+from app.services.retrieval.cross_encoder_reranker import reranker
 from app.middleware.rate_limiting import limiter
 from app.config import settings
 import logging
@@ -45,21 +48,20 @@ async def register_user(
     user_data: UserCreate,
     db: AsyncSession = Depends(get_db)
 ):
-    """Register a new user"""
+    """Register a new user with namespace only"""
     try:
-        # Check if user already exists
-        existing_user = await storage_service.get_user_by_email(db, user_data.email)
+        # Check if namespace already exists
+        existing_user = await storage_service.get_user_by_namespace(db, user_data.namespace)
         if existing_user:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email already registered"
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Namespace already exists"
             )
         
-        # Create the user
+        # Create the user with namespace
         user = await storage_service.create_user(
             db, 
-            email=user_data.email, 
-            password=user_data.password
+            namespace=user_data.namespace
         )
         return user
         
@@ -79,30 +81,23 @@ async def login(
     login_data: UserLogin,
     db: AsyncSession = Depends(get_db)
 ):
-    """Login with email and password"""
+    """Login with namespace only"""
     try:
-        # Get user by email
-        user = await storage_service.get_user_by_email(db, login_data.email)
+        # Get user by namespace
+        user = await storage_service.get_user_by_namespace(db, login_data.namespace)
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid email or password"
+                detail="Invalid namespace"
             )
         
-        # Verify password
-        if not user.password_hash or not auth_service.verify_password(login_data.password, user.password_hash):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid email or password"
-            )
-        
-        # Create access token
-        access_token = auth_service.create_access_token(str(user.id))
+        # Create access token with namespace
+        access_token = auth_service.create_access_token(user.namespace)
         
         return TokenResponse(
             access_token=access_token,
             token_type="bearer",
-            user_id=user.id
+            namespace=user.namespace
         )
         
     except HTTPException:
@@ -113,18 +108,14 @@ async def login(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Login failed"
         )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Login failed"
-        )
 
-@router.get("/users/{user_id}", response_model=UserResponse)
+@router.get("/users/{namespace}", response_model=UserResponse)
 async def get_user(
-    user_id: UUID,
+    namespace: str,
     db: AsyncSession = Depends(get_db)
 ):
-    """Get user by ID"""
-    user = await storage_service.get_user_by_id(db, user_id)
+    """Get user by namespace"""
+    user = await storage_service.get_user_by_namespace(db, namespace)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -137,7 +128,7 @@ async def get_user(
 @router.post("/remember/text", response_model=SuccessResponse)
 async def remember_text(
     request: TextMemoryRequest,
-    user_id: UUID = Query(..., description="User ID"),
+    namespace: str = Query(..., description="User namespace"),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -151,7 +142,7 @@ async def remember_text(
     """
     try:
         # Verify user exists
-        user = await storage_service.get_user_by_id(db, user_id)
+        user = await storage_service.get_user_by_namespace(db, namespace)
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -167,7 +158,7 @@ async def remember_text(
         # Create memory with embeddings
         memory = await storage_service.create_memory(
             db=db,
-            user_id=user_id,
+            namespace=namespace,
             content_type="text",
             content=processed["original_text"],
             chunks=processed["chunks"],
@@ -196,7 +187,7 @@ async def remember_text(
 @router.post("/remember/image", response_model=SuccessResponse)
 async def remember_image(
     file: UploadFile = File(...),
-    user_id: UUID = Query(..., description="User ID"),
+    namespace: str = Query(..., description="User namespace"),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -211,7 +202,7 @@ async def remember_image(
     """
     try:
         # Verify user exists
-        user = await storage_service.get_user_by_id(db, user_id)
+        user = await storage_service.get_user_by_namespace(db, namespace)
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -236,7 +227,7 @@ async def remember_image(
         file_stream.seek(0)
         object_path = minio_service.upload_file(
             file_stream,
-            user_id,
+            namespace,
             "image",
             file.filename,
             file.content_type or "image/jpeg"
@@ -245,7 +236,7 @@ async def remember_image(
         # Create memory with OCR text chunks
         memory = await storage_service.create_memory(
             db=db,
-            user_id=user_id,
+            namespace=namespace,
             content_type="image",
             content=processed["ocr_text"],
             chunks=[{
@@ -284,7 +275,7 @@ async def remember_image(
 @router.post("/remember/pdf", response_model=SuccessResponse)
 async def remember_pdf(
     file: UploadFile = File(...),
-    user_id: UUID = Query(..., description="User ID"),
+    namespace: str = Query(..., description="User namespace"),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -299,7 +290,7 @@ async def remember_pdf(
     """
     try:
         # Verify user exists
-        user = await storage_service.get_user_by_id(db, user_id)
+        user = await storage_service.get_user_by_namespace(db, namespace)
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -327,7 +318,7 @@ async def remember_pdf(
         file_stream.seek(0)
         object_path = minio_service.upload_file(
             file_stream,
-            user_id,
+            namespace,
             "pdf",
             file.filename,
             "application/pdf"
@@ -336,7 +327,7 @@ async def remember_pdf(
         # Create memory with text chunks
         memory = await storage_service.create_memory(
             db=db,
-            user_id=user_id,
+            namespace=namespace,
             content_type="pdf",
             content=processed["full_text"],
             chunks=processed["chunks"],
@@ -373,7 +364,7 @@ async def remember_pdf(
 @router.post("/remember/audio", response_model=SuccessResponse)
 async def remember_audio(
     file: UploadFile = File(...),
-    user_id: UUID = Query(..., description="User ID"),
+    namespace: str = Query(..., description="User namespace"),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -388,7 +379,7 @@ async def remember_audio(
     """
     try:
         # Verify user exists
-        user = await storage_service.get_user_by_id(db, user_id)
+        user = await storage_service.get_user_by_namespace(db, namespace)
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -414,7 +405,7 @@ async def remember_audio(
         file_stream.seek(0)
         object_path = minio_service.upload_file(
             file_stream,
-            user_id,
+            namespace,
             "audio",
             file.filename,
             file.content_type or "audio/mpeg"
@@ -423,7 +414,7 @@ async def remember_audio(
         # Create memory with transcript chunks
         memory = await storage_service.create_memory(
             db=db,
-            user_id=user_id,
+            namespace=namespace,
             content_type="audio",
             content=processed["transcript"],
             chunks=processed["chunks"],
@@ -460,7 +451,7 @@ async def remember_audio(
 
 @router.get("/memories", response_model=MemoryListResponse)
 async def list_memories(
-    user_id: UUID = Query(..., description="User ID"),
+    namespace: str = Query(..., description="User namespace"),
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
     db: AsyncSession = Depends(get_db)
@@ -469,7 +460,7 @@ async def list_memories(
     try:
         skip = (page - 1) * page_size
         memories, total = await storage_service.get_memories(
-            db, user_id, skip=skip, limit=page_size
+            db, namespace, skip=skip, limit=page_size
         )
         
         # Convert database models to response schemas
@@ -492,12 +483,12 @@ async def list_memories(
 @router.delete("/memories/{memory_id}", response_model=SuccessResponse)
 async def delete_memory(
     memory_id: UUID,
-    user_id: UUID = Query(..., description="User ID"),
+    namespace: str = Query(..., description="User namespace"),
     db: AsyncSession = Depends(get_db)
 ):
     """Delete a memory"""
     try:
-        deleted = await storage_service.delete_memory(db, user_id, memory_id)
+        deleted = await storage_service.delete_memory(db, namespace, memory_id)
         
         if not deleted:
             raise HTTPException(
@@ -521,10 +512,92 @@ async def delete_memory(
 
 # ==================== SEARCH ENDPOINT ====================
 
+@router.post("/search/advanced", response_model=AdvancedSearchResponse)
+@limiter.limit("20/minute")
+async def advanced_search(
+    request: Request,
+    advanced_request: AdvancedSearchRequest,
+    namespace: str = Query(..., description="User namespace"),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Advanced hybrid search with semantic + lexical + re-ranking
+    
+    This endpoint:
+    1. Generates query embedding
+    2. Performs hybrid search (vector + BM25)
+    3. Optionally applies Cross-Encoder re-ranking
+    4. Returns ranked results with detailed scores
+    
+    Features:
+    - Vector similarity search for semantic matching
+    - BM25 for lexical/keyword matching  
+    - Cross-Encoder for relevance re-ranking
+    - Configurable fusion methods (weighted, RRF)
+    """
+    try:
+        # Verify user exists
+        user = await storage_service.get_user_by_namespace(db, namespace)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        # Generate query embedding
+        query_embedding = await embedding_service.embed_text(advanced_request.query)
+        
+        # Perform advanced hybrid search
+        results = await advanced_hybrid_search.search(
+            db=db,
+            namespace=namespace,
+            query_embedding=query_embedding,
+            query_text=advanced_request.query,
+            top_k=advanced_request.top_k,
+            content_type=advanced_request.content_type,
+            fusion_method=advanced_request.fusion_method,
+            use_reranking=advanced_request.use_reranking
+        )
+        
+        # Format results
+        search_results = []
+        for result in results:
+            search_result = AdvancedSearchResult(
+                memory_id=result["memory_id"],
+                content_type=result["content_type"],
+                chunk_text=result["chunk_text"],
+                vector_similarity=result.get("similarity", 0.0),
+                bm25_score=result.get("bm25_score"),
+                re_ranking_score=result.get("re_ranking_score"),
+                hybrid_score=result.get("hybrid_score", 0.0),
+                rank=result.get("rank", 0),
+                metadata=result.get("metadata", {}),
+                created_at=result["created_at"]
+            )
+            search_results.append(search_result)
+        
+        return AdvancedSearchResponse(
+            results=search_results,
+            query=advanced_request.query,
+            total_results=len(search_results),
+            fusion_method=advanced_request.fusion_method,
+            reranking_used=advanced_request.use_reranking
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Advanced search failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Advanced search failed: {str(e)}"
+        )
+
+
 @router.get("/search", response_model=SearchResponse)
 async def search_memories(
     q: str = Query(..., description="Search query", min_length=1),
-    user_id: UUID = Query(..., description="User ID"),
+    namespace: str = Query(..., description="User namespace"),
     top_k: int = Query(5, ge=1, le=50),
     content_type: Optional[str] = Query(None, description="Filter by content type"),
     db: AsyncSession = Depends(get_db)
@@ -544,13 +617,13 @@ async def search_memories(
         # Search memories
         results = await storage_service.search_memories(
             db=db,
-            user_id=user_id,
+            namespace=namespace,
             query_embedding=query_embedding,
             top_k=top_k * 2,
             content_type=content_type
         )
         
-        reranked_results = await reranking_service.rerank_results(results, user_id, db)
+        reranked_results = await reranking_service.rerank_results(results, namespace, db)
         
         final_results = reranked_results[:top_k]
         
@@ -587,7 +660,7 @@ async def health_check():
 @router.post("/ask", response_model=AskResponse)
 async def ask_question(
     request: AskRequest,
-    user_id: UUID = Query(..., description="User ID"),
+    namespace: str = Query(..., description="User namespace"),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -608,7 +681,7 @@ async def ask_question(
     from datetime import datetime
     
     try:
-        user = await storage_service.get_user_by_id(db, user_id)
+        user = await storage_service.get_user_by_namespace(db, namespace)
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -637,7 +710,7 @@ async def ask_question(
         
         retrieval_results = await retriever.retrieve(
             db=db,
-            user_id=user_id,
+            namespace=namespace,
             query=request.question,
             top_k=request.top_k,
             enable_web=request.enable_web_search
@@ -645,6 +718,7 @@ async def ask_question(
         
         local_results = retrieval_results.get("local_results", [])
         web_results = retrieval_results.get("web_results", [])
+        has_memory = retrieval_results.get("has_memory", False)
         all_results = local_results + web_results
         
         context = context_builder.build_context(all_results)
@@ -652,7 +726,8 @@ async def ask_question(
         prompt_messages = context_builder.build_prompt(
             query=request.question,
             context=context,
-            conversation_history=conversation_history
+            conversation_history=conversation_history,
+            has_memory=has_memory
         )
         
         answer = await llm_generator.generate(prompt_messages)
@@ -662,7 +737,7 @@ async def ask_question(
         if not conversation_id:
             from app.models.models import Conversation
             conversation = Conversation(
-                user_id=user_id,
+                namespace=namespace,
                 title=request.question[:100]
             )
             db.add(conversation)
@@ -711,7 +786,7 @@ async def ask_question(
 @router.post("/ask/stream")
 async def ask_question_stream(
     request: AskRequest,
-    user_id: UUID = Query(..., description="User ID"),
+    namespace: str = Query(..., description="User namespace"),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -727,7 +802,7 @@ async def ask_question_stream(
     
     async def event_generator():
         try:
-            user = await storage_service.get_user_by_id(db, user_id)
+            user = await storage_service.get_user_by_namespace(db, namespace)
             if not user:
                 yield {"data": json.dumps({"error": "User not found"})}
                 return
@@ -749,7 +824,7 @@ async def ask_question_stream(
             
             retrieval_results = await retriever.retrieve(
                 db=db,
-                user_id=user_id,
+                namespace=namespace,
                 query=request.question,
                 top_k=request.top_k,
                 enable_web=request.enable_web_search
@@ -774,7 +849,7 @@ async def ask_question_stream(
             
             if not conversation_id:
                 conversation = Conversation(
-                    user_id=user_id,
+                    namespace=namespace,
                     title=request.question[:100]
                 )
                 db.add(conversation)
@@ -818,14 +893,14 @@ async def ask_question_stream(
 @router.post("/conversations", response_model=ConversationResponse)
 async def create_conversation(
     request: ConversationCreate,
-    user_id: UUID = Query(..., description="User ID"),
+    namespace: str = Query(..., description="User namespace"),
     db: AsyncSession = Depends(get_db)
 ):
     """Create a new conversation"""
     from app.models.models import Conversation
     
     try:
-        user = await storage_service.get_user_by_id(db, user_id)
+        user = await storage_service.get_user_by_namespace(db, namespace)
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -833,7 +908,7 @@ async def create_conversation(
             )
         
         conversation = Conversation(
-            user_id=user_id,
+            namespace=namespace,
             title=request.title or "New Conversation"
         )
         db.add(conversation)
@@ -853,7 +928,7 @@ async def create_conversation(
 
 @router.get("/conversations", response_model=List[ConversationResponse])
 async def list_conversations(
-    user_id: UUID = Query(..., description="User ID"),
+    namespace: str = Query(..., description="User namespace"),
     db: AsyncSession = Depends(get_db)
 ):
     """List all conversations for a user"""
@@ -863,7 +938,7 @@ async def list_conversations(
     try:
         result = await db.execute(
             select(Conversation)
-            .where(Conversation.user_id == user_id)
+            .where(Conversation.namespace == namespace)
             .order_by(Conversation.updated_at.desc())
         )
         conversations = result.scalars().all()
@@ -879,7 +954,7 @@ async def list_conversations(
 @router.get("/conversations/{conversation_id}", response_model=ConversationWithMessages)
 async def get_conversation(
     conversation_id: UUID,
-    user_id: UUID = Query(..., description="User ID"),
+    namespace: str = Query(..., description="User namespace"),
     db: AsyncSession = Depends(get_db)
 ):
     """Get a conversation with all messages"""
@@ -891,7 +966,7 @@ async def get_conversation(
             select(Conversation)
             .where(
                 Conversation.id == conversation_id,
-                Conversation.user_id == user_id
+                Conversation.namespace == namespace
             )
         )
         conversation = result.scalar_one_or_none()
@@ -911,7 +986,7 @@ async def get_conversation(
         
         return ConversationWithMessages(
             id=conversation.id,
-            user_id=conversation.user_id,
+            namespace=conversation.namespace,
             title=conversation.title,
             created_at=conversation.created_at,
             updated_at=conversation.updated_at,
@@ -930,7 +1005,7 @@ async def get_conversation(
 @router.delete("/conversations/{conversation_id}", response_model=SuccessResponse)
 async def delete_conversation(
     conversation_id: UUID,
-    user_id: UUID = Query(..., description="User ID"),
+    namespace: str = Query(..., description="User namespace"),
     db: AsyncSession = Depends(get_db)
 ):
     """Delete a conversation and all its messages"""
@@ -942,7 +1017,7 @@ async def delete_conversation(
             select(Conversation)
             .where(
                 Conversation.id == conversation_id,
-                Conversation.user_id == user_id
+                Conversation.namespace == namespace
             )
         )
         conversation = result.scalar_one_or_none()
@@ -974,15 +1049,15 @@ async def delete_conversation(
 
 @router.get("/preferences", response_model=PreferencesResponse)
 async def get_preferences(
-    user_id: UUID = Depends(get_current_user_id),
+    namespace: str = Depends(get_current_user_namespace),
     db: AsyncSession = Depends(get_db)
 ):
     """Get user preferences"""
     try:
-        preferences = await preferences_service.get_preferences(db, user_id)
+        preferences = await preferences_service.get_preferences(db, namespace)
         
         if not preferences:
-            preferences = await preferences_service.create_preferences(db, user_id)
+            preferences = await preferences_service.create_preferences(db, namespace)
         
         return preferences
         
@@ -996,14 +1071,14 @@ async def get_preferences(
 @router.put("/preferences", response_model=PreferencesResponse)
 async def update_preferences(
     request: PreferencesUpdate,
-    user_id: UUID = Depends(get_current_user_id),
+    namespace: str = Depends(get_current_user_namespace),
     db: AsyncSession = Depends(get_db)
 ):
     """Update user preferences"""
     try:
         preferences = await preferences_service.update_preferences(
             db=db,
-            user_id=user_id,
+            namespace=namespace,
             boost_topics=request.boost_topics,
             suppress_topics=request.suppress_topics,
             search_preferences=request.search_preferences
@@ -1021,12 +1096,12 @@ async def update_preferences(
 @router.post("/preferences/boost/{topic}", response_model=PreferencesResponse)
 async def add_boost_topic(
     topic: str,
-    user_id: UUID = Depends(get_current_user_id),
+    namespace: str = Depends(get_current_user_namespace),
     db: AsyncSession = Depends(get_db)
 ):
     """Add a topic to boost in search results"""
     try:
-        preferences = await preferences_service.add_boost_topic(db, user_id, topic)
+        preferences = await preferences_service.add_boost_topic(db, namespace, topic)
         return preferences
         
     except Exception as e:
@@ -1039,12 +1114,12 @@ async def add_boost_topic(
 @router.delete("/preferences/boost/{topic}", response_model=PreferencesResponse)
 async def remove_boost_topic(
     topic: str,
-    user_id: UUID = Depends(get_current_user_id),
+    namespace: str = Depends(get_current_user_namespace),
     db: AsyncSession = Depends(get_db)
 ):
     """Remove a topic from boost list"""
     try:
-        preferences = await preferences_service.remove_boost_topic(db, user_id, topic)
+        preferences = await preferences_service.remove_boost_topic(db, namespace, topic)
         return preferences
         
     except Exception as e:
@@ -1057,12 +1132,12 @@ async def remove_boost_topic(
 @router.post("/preferences/suppress/{topic}", response_model=PreferencesResponse)
 async def add_suppress_topic(
     topic: str,
-    user_id: UUID = Depends(get_current_user_id),
+    namespace: str = Depends(get_current_user_namespace),
     db: AsyncSession = Depends(get_db)
 ):
     """Add a topic to suppress in search results"""
     try:
-        preferences = await preferences_service.add_suppress_topic(db, user_id, topic)
+        preferences = await preferences_service.add_suppress_topic(db, namespace, topic)
         return preferences
         
     except Exception as e:
@@ -1075,12 +1150,12 @@ async def add_suppress_topic(
 @router.delete("/preferences/suppress/{topic}", response_model=PreferencesResponse)
 async def remove_suppress_topic(
     topic: str,
-    user_id: UUID = Depends(get_current_user_id),
+    namespace: str = Depends(get_current_user_namespace),
     db: AsyncSession = Depends(get_db)
 ):
     """Remove a topic from suppress list"""
     try:
-        preferences = await preferences_service.remove_suppress_topic(db, user_id, topic)
+        preferences = await preferences_service.remove_suppress_topic(db, namespace, topic)
         return preferences
         
     except Exception as e:
@@ -1094,12 +1169,12 @@ async def remove_suppress_topic(
 
 @router.get("/stats/dashboard", response_model=UserStatsResponse)
 async def get_dashboard_stats(
-    user_id: UUID = Depends(get_current_user_id),
+    namespace: str = Depends(get_current_user_namespace),
     db: AsyncSession = Depends(get_db)
 ):
     """Get comprehensive user statistics for dashboard"""
     try:
-        stats = await analytics_service.get_user_stats(db, user_id)
+        stats = await analytics_service.get_user_stats(db, namespace)
         return UserStatsResponse(**stats)
         
     except Exception as e:
@@ -1111,7 +1186,7 @@ async def get_dashboard_stats(
 
 @router.get("/memories/timeline", response_model=TimelineResponse)
 async def get_memories_timeline(
-    user_id: UUID = Depends(get_current_user_id),
+    namespace: str = Depends(get_current_user_namespace),
     page: int = Query(1, ge=1),
     page_size: int = Query(30, ge=1, le=100),
     db: AsyncSession = Depends(get_db)
@@ -1121,7 +1196,7 @@ async def get_memories_timeline(
         skip = (page - 1) * page_size
         timeline = await analytics_service.get_timeline_grouped(
             db=db,
-            user_id=user_id,
+            namespace=namespace,
             skip=skip,
             limit=page_size
         )
@@ -1142,13 +1217,13 @@ async def get_memories_timeline(
 
 @router.get("/stats/popular-searches", response_model=PopularSearchesResponse)
 async def get_popular_searches(
-    user_id: UUID = Depends(get_current_user_id),
+    namespace: str = Depends(get_current_user_namespace),
     limit: int = Query(10, ge=1, le=50),
     db: AsyncSession = Depends(get_db)
 ):
     """Get most popular search queries"""
     try:
-        searches = await analytics_service.get_popular_searches(db, user_id, limit)
+        searches = await analytics_service.get_popular_searches(db, namespace, limit)
         
         return PopularSearchesResponse(
             searches=[PopularSearch(**s) for s in searches]
@@ -1166,7 +1241,7 @@ async def get_popular_searches(
 @router.post("/web/search", response_model=WebSearchResponse)
 async def web_search(
     request: WebSearchRequest,
-    user_id: UUID = Query(..., description="User ID"),
+    namespace: str = Query(..., description="User namespace"),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -1176,7 +1251,7 @@ async def web_search(
     from app.services.web.scraper import web_scraper
     
     try:
-        user = await storage_service.get_user_by_id(db, user_id)
+        user = await storage_service.get_user_by_namespace(db, namespace)
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -1232,14 +1307,14 @@ async def web_search(
 @router.post("/web/scrape")
 async def scrape_url(
     url: str = Query(..., description="URL to scrape"),
-    user_id: UUID = Query(..., description="User ID"),
+    namespace: str = Query(..., description="User namespace"),
     db: AsyncSession = Depends(get_db)
 ):
     """Scrape content from a specific URL"""
     from app.services.web.scraper import web_scraper
     
     try:
-        user = await storage_service.get_user_by_id(db, user_id)
+        user = await storage_service.get_user_by_namespace(db, namespace)
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,

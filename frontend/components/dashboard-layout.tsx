@@ -24,6 +24,7 @@ import {
   Settings,
   FileText,
   History,
+  Folder,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -35,6 +36,7 @@ const navigation = [
   { name: 'My Memories', href: 'memories', icon: FileText },
   { name: 'Timeline', href: 'timeline', icon: History },
   { name: 'Analytics', href: 'analytics', icon: BarChart3 },
+  { name: 'Namespaces', href: 'namespaces', icon: Folder },
   { name: 'Settings', href: 'settings', icon: Settings },
 ];
 

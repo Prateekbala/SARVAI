@@ -70,20 +70,23 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold mb-2">Settings</h2>
-        <p className="text-gray-600 dark:text-gray-400">
+    <div className="max-w-4xl mx-auto space-y-6 animate-fade-in-up">
+      <div className="space-y-2">
+        <h2 className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-red-500 to-orange-500">Settings</h2>
+        <p className="text-muted-foreground text-lg">
           Manage your preferences and personalization
         </p>
       </div>
 
       {/* Boost Topics */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <TrendingUp className="h-5 w-5 text-green-600 dark:text-green-400" />
-            <CardTitle>Boost Topics</CardTitle>
+      <Card className="hover-lift border border-green-900/20 shadow-lg overflow-hidden bg-gradient-to-br from-black to-gray-900">
+        <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-emerald-500/5" />
+        <CardHeader className="relative">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gradient-to-br from-green-600 to-emerald-700 rounded-lg shadow-lg shadow-green-900/50">
+              <TrendingUp className="h-5 w-5 text-white" />
+            </div>
+            <CardTitle className="text-xl">Boost Topics</CardTitle>
           </div>
           <CardDescription>
             Topics to prioritize in search results and recommendations
@@ -135,11 +138,14 @@ export function SettingsPage() {
       </Card>
 
       {/* Suppress Topics */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <TrendingDown className="h-5 w-5 text-red-600 dark:text-red-400" />
-            <CardTitle>Suppress Topics</CardTitle>
+      <Card className="hover-lift border border-red-900/20 shadow-lg overflow-hidden bg-gradient-to-br from-black to-gray-900">
+        <div className="absolute inset-0 bg-gradient-to-br from-red-500/5 to-orange-500/5" />
+        <CardHeader className="relative">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gradient-to-br from-red-600 to-orange-700 rounded-lg shadow-lg shadow-red-900/50">
+              <TrendingDown className="h-5 w-5 text-white" />
+            </div>
+            <CardTitle className="text-xl">Suppress Topics</CardTitle>
           </div>
           <CardDescription>
             Topics to de-prioritize in search results
@@ -191,11 +197,14 @@ export function SettingsPage() {
       </Card>
 
       {/* Account Info */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <Settings className="h-5 w-5" />
-            <CardTitle>Account Information</CardTitle>
+      <Card className="hover-lift border border-gray-800 shadow-lg overflow-hidden bg-gradient-to-br from-black to-gray-900">
+        <div className="absolute inset-0 bg-gradient-to-br from-gray-500/5 to-gray-600/5" />
+        <CardHeader className="relative">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gradient-to-br from-gray-700 to-gray-800 rounded-lg shadow-lg">
+              <Settings className="h-5 w-5 text-white" />
+            </div>
+            <CardTitle className="text-xl">Account Information</CardTitle>
           </div>
           <CardDescription>
             Your account details and preferences
@@ -203,8 +212,8 @@ export function SettingsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label>User ID</Label>
-            <Input value={preferences?.user_id || ''} disabled />
+            <Label>Namespace</Label>
+            <Input value={preferences?.namespace || ''} disabled />
           </div>
           <div className="space-y-2">
             <Label>Created</Label>

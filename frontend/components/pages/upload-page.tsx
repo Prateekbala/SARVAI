@@ -17,7 +17,7 @@ export function UploadPage() {
   const queryClient = useQueryClient();
 
   const uploadTextMutation = useMutation({
-    mutationFn: (text: string) => memoryAPI.createText(text),
+    mutationFn: (text: string) => memoryAPI.storeText(text),
     onSuccess: () => {
       toast.success('Text memory saved successfully!');
       setTextContent('');
@@ -31,9 +31,9 @@ export function UploadPage() {
 
   const uploadFileMutation = useMutation({
     mutationFn: ({ file, type }: { file: File; type: 'image' | 'pdf' | 'audio' }) => {
-      if (type === 'image') return memoryAPI.uploadImage(file);
-      if (type === 'pdf') return memoryAPI.uploadPDF(file);
-      return memoryAPI.uploadAudio(file);
+      if (type === 'image') return memoryAPI.storeImage(file);
+      if (type === 'pdf') return memoryAPI.storePDF(file);
+      return memoryAPI.storeAudio(file);
     },
     onSuccess: (_, variables) => {
       toast.success(`${variables.type.toUpperCase()} uploaded successfully!`);
@@ -67,29 +67,33 @@ export function UploadPage() {
     return (
       <div
         {...getRootProps()}
-        className={`border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors ${
+        className={`border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-all duration-300 ${
           isDragActive
-            ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20'
-            : 'border-gray-300 dark:border-gray-700 hover:border-purple-400 dark:hover:border-purple-600'
+            ? 'border-red-500 bg-gradient-to-br from-red-950/50 to-orange-950/50 scale-105 shadow-xl border-red-600'
+            : 'border-gray-700 hover:border-red-600 hover:shadow-lg hover:scale-102 bg-gray-900/30'
         }`}
       >
         <input {...getInputProps()} />
-        <Icon className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-        <p className="text-lg font-medium mb-2">
-          {isDragActive ? `Drop your ${type} here` : `Drag & drop ${type} here`}
-        </p>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          or click to browse
-        </p>
+        <div className="flex flex-col items-center">
+          <div className="p-4 bg-gradient-to-br from-red-900/50 to-orange-900/50 rounded-2xl mb-4 shadow-lg border border-red-800/30">
+            <Icon className="h-12 w-12 text-red-400" />
+          </div>
+          <p className="text-lg font-semibold mb-2">
+            {isDragActive ? `Drop your ${type} here` : `Drag & drop ${type} here`}
+          </p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">
+            or click to browse
+          </p>
+        </div>
       </div>
     );
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div>
-        <h2 className="text-3xl font-bold mb-2">Upload Memory</h2>
-        <p className="text-gray-600 dark:text-gray-400">
+    <div className="max-w-4xl mx-auto space-y-6 animate-fade-in-up">
+      <div className="space-y-2">
+        <h2 className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-red-500 to-orange-500">Upload Memory</h2>
+        <p className="text-muted-foreground text-lg">
           Add content to your AI memory in any format
         </p>
       </div>

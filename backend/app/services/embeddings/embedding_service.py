@@ -1,7 +1,8 @@
 from sentence_transformers import SentenceTransformer
-from typing import List, Union, Optional
+from typing import List, Union, Optional, Dict, Any
 import numpy as np
 from app.config import settings, MODELS_DIR
+from .qdrant_manager import qdrant_manager
 import logging
 from .embedding_cache import (
     embedding_cache,
@@ -9,6 +10,7 @@ from .embedding_cache import (
     semantic_deduplicator,
     quality_analyzer
 )
+from qdrant_client.models import PointStruct
 
 logger = logging.getLogger(__name__)
 
@@ -227,5 +229,92 @@ class EmbeddingService:
         """Enable or disable caching"""
         self.cache_enabled = enabled
         logger.info(f"Embedding cache {'enabled' if enabled else 'disabled'}")
+    
+    async def store_in_qdrant(
+        self,
+        collection_name: str,
+        embeddings: List[List[float]],
+        namespace: str,
+        memory_id: str,
+        chunk_texts: List[str],
+        content_type: str = "text"
+    ) -> List[str]:
+        """
+        Store embeddings in Qdrant
+        
+        Args:
+            collection_name: Qdrant collection name
+            embeddings: List of embedding vectors
+            namespace: User namespace
+            memory_id: Memory ID
+            chunk_texts: List of chunk texts
+            content_type: Type of content
+            
+        Returns:
+            List of point IDs stored in Qdrant
+        """
+        try:
+            # Create PointStruct objects for Qdrant
+            points = []
+            for idx, (embedding, chunk_text) in enumerate(zip(embeddings, chunk_texts)):
+                # Create point ID from memory_id and index
+                point_id = hash(f"{memory_id}_{idx}") & 0x7FFFFFFF  # Ensure positive integer
+                
+                point = PointStruct(
+                    id=point_id,
+                    vector=embedding,
+                    payload={
+                        "memory_id": str(memory_id),
+                        "namespace": namespace,
+                        "content_type": content_type,
+                        "chunk_index": idx,
+                        "chunk_text": chunk_text
+                    }
+                )
+                points.append(point)
+            
+            # Upsert to Qdrant
+            point_ids = qdrant_manager.upsert_embeddings(collection_name, points)
+            
+            logger.info(f"Stored {len(point_ids)} embeddings in Qdrant collection {collection_name}")
+            return [str(pid) for pid in point_ids]
+        
+        except Exception as e:
+            logger.error(f"Failed to store embeddings in Qdrant: {e}")
+            raise
+    
+    async def search_qdrant(
+        self,
+        collection_name: str,
+        query_embedding: List[float],
+        namespace: str,
+        content_type: Optional[str] = None,
+        top_k: int = 5
+    ) -> List[Dict[str, Any]]:
+        """
+        Search embeddings in Qdrant
+        
+        Args:
+            collection_name: Qdrant collection name
+            query_embedding: Query embedding vector
+            namespace: User namespace for filtering
+            content_type: Optional content type filter
+            top_k: Number of results
+            
+        Returns:
+            List of search results with scores and metadata
+        """
+        try:
+            results = qdrant_manager.search_embeddings(
+                collection_name=collection_name,
+                query_embedding=query_embedding,
+                namespace=namespace,
+                content_type=content_type,
+                top_k=top_k
+            )
+            return results
+        except Exception as e:
+            logger.error(f"Search in Qdrant failed: {e}")
+            raise
 
 embedding_service = EmbeddingService()

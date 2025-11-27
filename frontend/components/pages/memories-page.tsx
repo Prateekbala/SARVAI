@@ -46,11 +46,11 @@ export function MemoriesPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6 animate-fade-in-up">
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold mb-2">My Memories</h2>
-          <p className="text-gray-600 dark:text-gray-400">
+        <div className="space-y-2">
+          <h2 className="text-4xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-red-500 to-orange-500">My Memories</h2>
+          <p className="text-muted-foreground text-lg">
             {data?.total || 0} total memories stored
           </p>
         </div>
@@ -59,18 +59,19 @@ export function MemoriesPage() {
       {data && data.memories.length > 0 ? (
         <>
           <div className="grid gap-4">
-            {data.memories.map((memory) => {
+            {data.memories.map((memory, index) => {
               const Icon = contentTypeIcons[memory.content_type as keyof typeof contentTypeIcons];
               return (
-                <Card key={memory.id} className="hover:shadow-md transition-shadow">
-                  <CardContent className="p-6">
+                <Card key={memory.id} className="hover-lift border-0 shadow-lg overflow-hidden group" style={{ animationDelay: `${index * 50}ms` }}>
+                  <div className="absolute inset-0 bg-gradient-to-r from-purple-500/5 to-blue-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <CardContent className="p-6 relative">
                     <div className="flex items-start gap-4">
-                      <div className="p-3 bg-gray-100 dark:bg-gray-800 rounded-lg shrink-0">
-                        <Icon className="h-6 w-6" />
+                      <div className="p-4 bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-700 rounded-xl shadow-md group-hover:scale-110 transition-transform duration-300 shrink-0">
+                        <Icon className="h-7 w-7 text-gray-700 dark:text-gray-300" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-4 mb-2">
-                          <Badge variant="secondary" className="capitalize">
+                        <div className="flex items-start justify-between gap-4 mb-3">
+                          <Badge variant="secondary" className="capitalize text-sm font-semibold">
                             {memory.content_type}
                           </Badge>
                           <Button
@@ -78,11 +79,12 @@ export function MemoriesPage() {
                             size="sm"
                             onClick={() => deleteMutation.mutate(memory.id)}
                             disabled={deleteMutation.isPending}
+                            className="hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                           >
                             <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
                           </Button>
                         </div>
-                        <p className="text-sm leading-relaxed mb-2">
+                        <p className="text-sm leading-relaxed mb-3 text-foreground/90">
                           {memory.content.slice(0, 300)}
                           {memory.content.length > 300 && '...'}
                         </p>
